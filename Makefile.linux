@@ -1,0 +1,8 @@
+CC = g++ -O2 -L. -m32
+LIBS = -lm -lSDL -lpthread -ldl
+SRC = main.cpp Timer.cpp
+
+all: main
+
+main: $(SRC)
+	$(CC) -o $@ $(SRC) $(LIBS)
