@@ -230,5 +230,9 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+<<<<<<< HEAD
 sdl/
 sdll/
+=======
+sdl/
+>>>>>>> origin/master
