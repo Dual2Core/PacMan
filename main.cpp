@@ -8,6 +8,8 @@ extern "C" {
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <cstdlib>
+#include <ctime>
 #define HERO_OFFSET 26
 #if defined(WINDOWS) || defined(WIN32) || defined(_WIN32)
 #include <windows.h>
@@ -20,6 +22,7 @@ extern "C" {
 
 // Comment out items to hide
 
+#define ALPHA
 //#define GRID
 //#define ROADS
 #define MAP
@@ -428,7 +431,9 @@ public:
 	Ghost()
 	{
 		speed = 1;
+		dir = LEFT;
 		dirPic[LEFT] = SDL_LoadBMP("blinky.bmp");
+		// DOPISZ RESZTE MAP BITOWYCH!!!
 
 	}
 	void setBehaviour(Behaviour bhv)
@@ -479,6 +484,12 @@ public:
 	int bSize;
 	double lastWT;
 	double delta;
+	
+	virtual void setPacMan(PacMan*) = 0;
+	virtual void setBlinky(Ghost*) = 0;
+	virtual void setPinky(Ghost*) = 0;
+	virtual void setInky(Ghost*) = 0;
+	virtual void setClyde(Ghost*) = 0;
 };
 
 void MoveSprite(PlayableMap *map, SDL_Surface *screen, Sprite *sprite, Path paths[300], int bSize, int worldTime);
@@ -596,28 +607,6 @@ public:
 				continue;
 			}	
 
-			// HorizontalLines
-			if (x == 0 && (blocks[TOP_MID].type == Road || blocks[BOTTOM_MID].type == Road) && blocks[RIGHT].type != Road)
-				blocks[MID].type = HorizontalLine;
-			else
-			if (x == 27 && (blocks[TOP_MID].type == Road || blocks[BOTTOM_MID].type == Road) && blocks[LEFT].type != Road)
-				blocks[MID].type = HorizontalLine;
-			else
-			if ((blocks[TOP_MID].type == Road || blocks[BOTTOM_MID].type == Road) && blocks[LEFT].type != Road && blocks[RIGHT].type != Road)
-				blocks[MID].type = HorizontalLine;
-			// ----------------
-			
-			// VerticalLines
-			if (y == 0 && (blocks[LEFT].type == Road || blocks[RIGHT].type == Road) && blocks[BOTTOM_MID].type != Road)
-				blocks[MID].type = VerticalLine;
-			else
-			if (y == 30 && (blocks[LEFT].type == Road || blocks[RIGHT].type == Road) && blocks[TOP_MID].type != Road)
-				blocks[MID].type = VerticalLine;
-			else
-			if ((blocks[LEFT].type == Road && x!=0 || blocks[RIGHT].type == Road && x!=27) && blocks[TOP_MID].type != Road && blocks[BOTTOM_MID].type != Road)
-				blocks[MID].type = VerticalLine;
-			// --------------
-
 			// RightBottomCurve
 			if (blocks[BOTTOM_RIGHT].type == Road && blocks[BOTTOM_MID].type != Road && blocks[RIGHT].type != Road)
 				blocks[MID].type = RightBottomCurve;
@@ -650,6 +639,27 @@ public:
 				blocks[MID].type = LeftTopCurve;
 			// ------------
 
+			// HorizontalLines
+			if (x == 0 && (blocks[TOP_MID].type == Road || blocks[BOTTOM_MID].type == Road) && blocks[RIGHT].type != Road)
+				blocks[MID].type = HorizontalLine;
+			else
+			if (x == 27 && (blocks[TOP_MID].type == Road || blocks[BOTTOM_MID].type == Road) && blocks[LEFT].type != Road)
+				blocks[MID].type = HorizontalLine;
+			else
+			if ((blocks[TOP_MID].type == Road || blocks[BOTTOM_MID].type == Road) && blocks[LEFT].type != Road && blocks[RIGHT].type != Road)
+				blocks[MID].type = HorizontalLine;
+			// ----------------
+
+			// VerticalLines
+			if (y == 0 && (blocks[LEFT].type == Road || blocks[RIGHT].type == Road) && blocks[BOTTOM_MID].type != Road)
+				blocks[MID].type = VerticalLine;
+			else
+			if (y == 30 && (blocks[LEFT].type == Road || blocks[RIGHT].type == Road) && blocks[TOP_MID].type != Road)
+				blocks[MID].type = VerticalLine;
+			else
+			if ((blocks[LEFT].type == Road && x != 0 || blocks[RIGHT].type == Road && x != 27) && blocks[TOP_MID].type != Road && blocks[BOTTOM_MID].type != Road)
+				blocks[MID].type = VerticalLine;
+			// --------------
 		}
 
 		PaintGrid(screen, blocks, bSize);
@@ -670,7 +680,7 @@ public:
 		// ---------------------------		
 	}
 	
-	void setBlinky(Ghost *ghs)
+	virtual void setBlinky(Ghost *ghs)
 	{
 		ghosts[BLINKY] = ghs;
 
@@ -679,6 +689,33 @@ public:
 		ghosts[BLINKY]->y = blinkystart->y;
 	}
 
+	virtual void setPinky(Ghost *ghs)
+	{
+		ghosts[PINKY] = ghs;
+
+		Block *blinkystart = &blocks[14][11];
+		ghosts[PINKY]->x = blinkystart->x;
+		ghosts[PINKY]->y = blinkystart->y;
+	}
+
+	virtual void setInky(Ghost *ghs)
+	{
+		ghosts[INKY] = ghs;
+
+		Block *blinkystart = &blocks[14][11];
+		ghosts[INKY]->x = blinkystart->x;
+		ghosts[INKY]->y = blinkystart->y;
+	}
+
+	virtual void setClyde(Ghost *ghs)
+	{
+		ghosts[CLYDE] = ghs;
+
+		Block *blinkystart = &blocks[14][11];
+		ghosts[CLYDE]->x = blinkystart->x;
+		ghosts[CLYDE]->y = blinkystart->y;
+	}
+	
 	virtual void DrawMap(SDL_Surface *screen, double worldTime)
 	{
 		UpdatePaths(screen, blocks, bSize);
@@ -688,12 +725,18 @@ public:
 		if (worldTime > 1000)
 		{
 			MoveSprite(this, screen, ghosts[BLINKY], paths, bSize, worldTime);
+			MoveSprite(this, screen, ghosts[PINKY], paths, bSize, worldTime);
+			MoveSprite(this, screen, ghosts[INKY], paths, bSize, worldTime);
+			MoveSprite(this, screen, ghosts[CLYDE], paths, bSize, worldTime);
 			MoveSprite(this, screen, pMan, paths, bSize, worldTime);
 		}
 		else
 		{
 			pMan->show();
 			ghosts[BLINKY]->show();
+			ghosts[PINKY]->show();
+			ghosts[INKY]->show();
+			ghosts[CLYDE]->show();
 		}
 	}
 };
@@ -763,6 +806,23 @@ bool IsAbleToMove(Sprite *sprite, Direction dir, Path paths[300], int bSize)
 
 }
 
+Direction getCounterDir(Direction dir)
+{
+	switch (dir)
+	{
+	case UP:
+		return DOWN;
+	case DOWN:
+		return UP;
+	case LEFT:
+		return RIGHT;
+	case RIGHT:
+		return LEFT;
+	}
+
+	return NONE;
+}
+
 void MoveSprite(PlayableMap *map, SDL_Surface *screen, Sprite *sprite, Path paths[300], int bSize, int worldTime)
 {
 	int step = sprite->speed;
@@ -779,16 +839,33 @@ void MoveSprite(PlayableMap *map, SDL_Surface *screen, Sprite *sprite, Path path
 	if (Ghost *ghost = dynamic_cast<Ghost*> (sprite))
 	{
 		Direction currentDir = ghost->dir;
-		
-		bool ableToMove[5];
+		Direction counterDir = getCounterDir(currentDir);
 
-		for (int i = 1; i < 5; i++)
-			ableToMove[i] = IsAbleToMove(ghost, (Direction)i, paths, bSize);
 
+		Direction possibleDirs[3] = { NONE, NONE, NONE };
+		int differentPosibilities = 0;
+
+		for (int i = 1, s = 0; i < 5; i++)
+		if ((Direction)i != counterDir && IsAbleToMove(ghost, (Direction)i, paths, bSize))
+		{
+			possibleDirs[s++] = static_cast <Direction> (i);
+			differentPosibilities++;
+		}
+
+#ifdef ALPHA
+		if (possibleDirs[0] == NONE)
+			ghost->dir = counterDir;
+		else
+#endif
 		switch (ghost->getBehaviour())
 		{
+			case PINKY:
+			case INKY:
+			case CLYDE:
 			case BLINKY:
-
+				int dirNr = rand() % differentPosibilities;
+				ghost->dir = possibleDirs[dirNr];
+				break;
 
 		}
 	}
@@ -862,10 +939,24 @@ int main(int argc, const char **argv) {
 	Ghost ghosts[4];
 	pMan->screen = screen;
 	for (int i = 0; i < 4; i++) ghosts[i].screen = screen;
-	((Level1*)map)->setPacMan(pMan);
-	((Level1*)map)->setBlinky(&ghosts[BLINKY]);
+	
+	// Set ghosts behaviour
+	ghosts[BLINKY].setBehaviour(BLINKY);
+	ghosts[PINKY].setBehaviour(PINKY);
+	ghosts[INKY].setBehaviour(INKY);
+	ghosts[CLYDE].setBehaviour(CLYDE);
+
+	// Set starting positions	
+	map->setPacMan(pMan);
+	map->setBlinky(&ghosts[BLINKY]);
+	map->setPinky(&ghosts[PINKY]);
+	map->setInky(&ghosts[INKY]);
+	map->setClyde(&ghosts[CLYDE]);
 	//Keep track of the current frame
 	int frame = 0;
+
+	//Load random number generator
+	srand(time(NULL));
 
 	//Whether or not to cap the frame rate
 	bool cap = true;
