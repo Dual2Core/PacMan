@@ -421,20 +421,25 @@ public:
 	}
 };
 
+typedef const unsigned short cushort;
+
 // Ghost
 class Ghost : public Sprite
 {
 private:
+	static cushort NUMBER_OF_GHOSTS = 4;
+	static cushort NUMBER_OF_DIRECTIONS = 4;
 	Behaviour behaviour;
-
+	SDL_Surface *dirPic[NUMBER_OF_GHOSTS][NUMBER_OF_DIRECTIONS];
 public:
 	Ghost()
 	{
 		speed = 1;
 		dir = LEFT;
-		dirPic[LEFT] = SDL_LoadBMP("blinky.bmp");
-		// DOPISZ RESZTE MAP BITOWYCH!!!
-
+		dirPic[BLINKY][LEFT] = SDL_LoadBMP("blinky.bmp");
+		dirPic[PINKY][LEFT] = SDL_LoadBMP("pinky.bmp");
+		dirPic[INKY][LEFT] = SDL_LoadBMP("inky.bmp");
+		dirPic[CLYDE][LEFT] = SDL_LoadBMP("clyde.bmp");
 	}
 	void setBehaviour(Behaviour bhv)
 	{
@@ -448,15 +453,15 @@ public:
 
 	virtual void show()
 	{
-		if (dirPic[LEFT] == NULL)
+		if (dirPic[behaviour][LEFT] == NULL)
 			printf("Access violation!");
 		else
-			DrawSurface(screen, dirPic[LEFT], x, y);
+			DrawSurface(screen, dirPic[behaviour][LEFT], x, y);
 	}
 
 	~Ghost()
 	{
-		SDL_FreeSurface(dirPic[LEFT]);
+		SDL_FreeSurface(dirPic[behaviour][LEFT]);
 	}
 };
 
