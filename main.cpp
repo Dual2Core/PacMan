@@ -154,6 +154,7 @@ enum BlockType
 {
 	Empty,
 	Road,
+	Entrance,
 	Booster,
 	Food,
 	LeftTopCurve,
@@ -170,11 +171,14 @@ struct Block
 	int x;
 	int y;
 	BlockType type;
+	bool food = false;
 };
 
 #define BLUE SDL_MapRGB(screen->format, 0x00, 0x00, 0xff)
 #define GRAY SDL_MapRGB(screen->format, 0xBE, 0xBE, 0xBE)
 #define DARK_GRAY SDL_MapRGB(screen->format, 139, 137, 137)
+#define WHITE SDL_MapRGB(screen->format, 255, 255, 255)
+#define YELLOW SDL_MapRGB(screen->format, 255, 255, 0)
 #define MARGIN_SIZE 10
 
 // Returns block size (length of square wall)
@@ -186,7 +190,7 @@ int GetBlockSize(int width, int height)
 	return sqsize;
 }
 
-#define CIRCLE_EQUATION (x-orx)*(x-orx)+(y-ory)*(y-ory)
+#define CIRCLE_EQUATION(x, orx, y, ory) ((x)-(orx))*((x)-(orx))+((y)-(ory))*((y)-(ory))
 // DrawCurve3
 // rysowanie krzywej o grubosci 3 o orientacji type
 void DrawCurve3(SDL_Surface *screen, int x0, int y0, int blockSize, BlockType type, Uint32 pixel)
@@ -220,7 +224,7 @@ void DrawCurve3(SDL_Surface *screen, int x0, int y0, int blockSize, BlockType ty
 	for (int x = x0; x <= x_end; ++x)
 	for (int y = y0; y <= y_end; ++y)
 	{
-		if (CIRCLE_EQUATION > (r - 1)*(r - 1) && CIRCLE_EQUATION < (r + 1)*(r + 1) + blockSize)
+		if (CIRCLE_EQUATION(x, orx, y, ory) > (r - 1)*(r - 1) && CIRCLE_EQUATION(x, orx, y, ory) < (r + 1)*(r + 1) + blockSize)
 			Putpixel(screen, x, y, pixel);
 	}
 
@@ -237,6 +241,25 @@ void DrawBlock(SDL_Surface *screen,int x, int y, int blockSize)
 	DrawLine(screen, x, y, blockSize, vertical, GRAY);
 	// right vert
 	DrawLine(screen, x + blockSize, y, blockSize, vertical, GRAY);
+}
+
+// DEPRECATED!
+// Draws food at selected coords
+void DrawFood(SDL_Surface *screen, int x, int y, int blockSize)
+{		
+	//	Procedural generation
+	int x0 = (x + x + blockSize) / 2;
+	int y0 = (y + y + blockSize) / 2;
+	static int sn = 0;
+	sn++;
+	for (int s = x; s <= x + blockSize; s++)
+	for (int n = y; n <= y + blockSize; n++)
+	{
+		//printf("s=%d n=%d, x0=%d y0=%d, sn=%d\n", s, n, x0, y0, sn);
+		if (CIRCLE_EQUATION(s, x0, n, y0) <= blockSize/4)
+			Putpixel(screen, s, n, YELLOW);
+	}
+	
 }
 
 // Draws the grid shadow
@@ -297,6 +320,9 @@ void PaintGrid(SDL_Surface *screen, Block blocks[28][31], int blockSize)
 				break;
 			case LeftTopCurve:
 				DrawCurve3(screen, block.x, block.y, blockSize, LeftTopCurve, BLUE);
+				break;
+			case Entrance:
+				DrawLine3(screen, block.x, block.y + blockSize / 2, blockSize, horizontal, WHITE);
 				break;
 #endif
 		}
@@ -440,6 +466,8 @@ public:
 		dirPic[PINKY][LEFT] = SDL_LoadBMP("pinky.bmp");
 		dirPic[INKY][LEFT] = SDL_LoadBMP("inky.bmp");
 		dirPic[CLYDE][LEFT] = SDL_LoadBMP("clyde.bmp");
+		for (int i = 0; i <= CLYDE; i++)
+			SDL_SetColorKey(dirPic[i][LEFT], SDL_SRCCOLORKEY, 0x00);
 	}
 	void setBehaviour(Behaviour bhv)
 	{
@@ -465,10 +493,17 @@ public:
 	}
 };
 
+class Player
+{
+public:
+	int score = 0;
+};
+
 struct Path
 {
 	int x;
 	int y;
+	bool food;
 };
 
 /************************************************************************/
@@ -478,7 +513,7 @@ struct Path
 class PlayableMap
 {
 public:
-	virtual void DrawMap(SDL_Surface *screen, double worldTime) = 0;
+	Player *player;
 
 	PacMan *pMan;
 	Ghost *ghosts[4];
@@ -489,22 +524,32 @@ public:
 	int bSize;
 	double lastWT;
 	double delta;
-	
+
+	virtual void DrawMap(SDL_Surface *screen, double worldTime) = 0;
+
 	virtual void setPacMan(PacMan*) = 0;
 	virtual void setBlinky(Ghost*) = 0;
 	virtual void setPinky(Ghost*) = 0;
 	virtual void setInky(Ghost*) = 0;
 	virtual void setClyde(Ghost*) = 0;
+
+	bool IsPointReachable(int, int, Path*, int);
+	bool IsAbleToMove(Sprite*, Direction, Path*, int);
+	Direction getCounterDir(Direction);
+	void MoveSprite(PlayableMap*, SDL_Surface*, Sprite*, Path*, int, int);
+	void DrawFoodMap(SDL_Surface*, Path*, int);
+	void PacManCollider();
+
 };
 
-void MoveSprite(PlayableMap *map, SDL_Surface *screen, Sprite *sprite, Path paths[300], int bSize, int worldTime);
 
 /* Poziom 1 */
 class Level1 : public PlayableMap
 {
 public:
-	Level1(SDL_Surface *screen)
+	Level1(SDL_Surface *screen, Player *player)
 	{
+		this->player = player;
 		height = screen->h;
 		width = screen->w;
 		
@@ -572,12 +617,16 @@ public:
 			else
 			if (y == 29 && x>0)
 				goto draw;
+			//else
+			//if (x > 10 && x < 17 && y > 9 && y < 13)
+			//	goto draw;
 
 			if (false)
 			{
 			draw:
 				Block *bl = &blocks[x][y];
 				bl->type = Road;
+				bl->food = true;
 			}
 		}
 		//--------------------------------
@@ -587,6 +636,7 @@ public:
 		for (int y = 0; y <= 30; y++)
 		{
 			blocks[x][y].type = blocks[27 - x][y].type;
+			blocks[x][y].food = blocks[27 - x][y].food;
 		}
 		//---------------------------------
 
@@ -608,6 +658,8 @@ public:
 			{
 				paths[coll].x = blocks[MID].x;
 				paths[coll].y = blocks[MID].y;
+				if (blocks[x][y].food)
+					paths[coll].food = true;
 				coll++;
 				continue;
 			}	
@@ -698,7 +750,7 @@ public:
 	{
 		ghosts[PINKY] = ghs;
 
-		Block *blinkystart = &blocks[14][11];
+		Block *blinkystart = &blocks[16][11];
 		ghosts[PINKY]->x = blinkystart->x;
 		ghosts[PINKY]->y = blinkystart->y;
 	}
@@ -723,8 +775,9 @@ public:
 	
 	virtual void DrawMap(SDL_Surface *screen, double worldTime)
 	{
-		UpdatePaths(screen, blocks, bSize);
-
+		UpdatePaths(screen, blocks, bSize); // Spróbuj optymalizowaæ ograniczeniem odleg³oœci
+		
+		DrawFoodMap(screen, paths, bSize); // Spróbuj optymalizowaæ ograniczeniem odleg³oœci
 
 
 		if (worldTime > 1000)
@@ -743,10 +796,12 @@ public:
 			ghosts[INKY]->show();
 			ghosts[CLYDE]->show();
 		}
+
+		PacManCollider();
 	}
 };
 
-bool IsPointReachable(int x, int y, Path paths[300], int bSize)
+bool PlayableMap::IsPointReachable(int x, int y, Path paths[300], int bSize)
 {
 	for (int i = 0; i < 300; i++)
 	if (x == paths[i].x && y >= paths[i].y && y <= paths[i].y + bSize || y == paths[i].y && x >= paths[i].x && x <= paths[i].x + bSize)
@@ -755,7 +810,7 @@ bool IsPointReachable(int x, int y, Path paths[300], int bSize)
 	return false;
 }
 
-bool IsAbleToMove(Sprite *sprite, Direction dir, Path paths[300], int bSize)
+bool PlayableMap::IsAbleToMove(Sprite *sprite, Direction dir, Path paths[300], int bSize)
 {
 	int orx = sprite->x;
 	int ory = sprite->y;
@@ -811,7 +866,7 @@ bool IsAbleToMove(Sprite *sprite, Direction dir, Path paths[300], int bSize)
 
 }
 
-Direction getCounterDir(Direction dir)
+Direction PlayableMap::getCounterDir(Direction dir)
 {
 	switch (dir)
 	{
@@ -828,7 +883,7 @@ Direction getCounterDir(Direction dir)
 	return NONE;
 }
 
-void MoveSprite(PlayableMap *map, SDL_Surface *screen, Sprite *sprite, Path paths[300], int bSize, int worldTime)
+void PlayableMap::MoveSprite(PlayableMap *map, SDL_Surface *screen, Sprite *sprite, Path paths[300], int bSize, int worldTime)
 {
 	int step = sprite->speed;
 	
@@ -897,6 +952,32 @@ void MoveSprite(PlayableMap *map, SDL_Surface *screen, Sprite *sprite, Path path
 	sprite->show();
 }
 
+void PlayableMap::DrawFoodMap(SDL_Surface *screen, Path paths[300], int bSize)
+{
+	//SDL_Surface *food = SDL_LoadBMP("food.bmp");
+	//SDL_SetColorKey(food, SDL_SRCCOLORKEY, 0x00);
+	for (int s = 0; s < 300; s++)
+	if (paths[s].food)
+	{
+		//DrawSurface(screen, food, paths[s].x, paths[s].y);
+		DrawFood(screen, paths[s].x, paths[s].y, bSize);
+	}
+}
+
+void PlayableMap::PacManCollider()
+{
+	/*pMan->x pMan->y*/
+	int xm = (pMan->x + bSize) / 2;
+	int ym = (pMan->y + bSize) / 2;
+	
+	for (int i = 0; i < 300; i++)
+	if (xm == (paths[i].x + bSize) / 2 && ym == (paths[i].y + bSize) / 2)
+	{
+		paths[i].food = false;
+		player->score++;
+	}
+}
+
 // WinMain
 #if defined(WINDOWS) || defined(WIN32) || defined(_WIN32)
 int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR str, int show) {
@@ -939,7 +1020,8 @@ int main(int argc, const char **argv) {
 
 
 	// Loading basic components
-	PlayableMap *map = new Level1(screen);
+	Player *player = new Player();
+	PlayableMap *map = new Level1(screen, player);
 	PacMan *pMan = new PacMan();
 	Ghost ghosts[4];
 	pMan->screen = screen;
